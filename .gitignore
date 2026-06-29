@@ -1,0 +1,6 @@
+wf-config.yml
+.env
+data/
+__pycache__/
+*.pyc
+.pytest_cache/

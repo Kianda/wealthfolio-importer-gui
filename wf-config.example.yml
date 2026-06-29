@@ -1,0 +1,25 @@
+# Copy to wf-config.yml at the repo root and edit. wf-config.yml is gitignored.
+
+wealthfolio:
+  # Base URL where your Wealthfolio instance is reachable.
+  base_url: http://localhost:24568      # internal URL, used by the GUI container to call the API
+  external_url: http://localhost:24568  # external URL, shown as a link in the UI for your browser
+  # Do NOT put the password here, pass it via the WF_PASSWORD env var.
+
+accounts:
+  # Account name used when no rule below matches a row's symbol.
+  # MUST match an account name that exists in your Wealthfolio instance.
+  default: cash
+
+  # First rule whose `symbols` list contains the row's symbol wins.
+  # Symbols are WF-format (post-adapter), e.g. 'SWDA.MI', not broker tickers.
+  rules:
+    - account: longterm
+      symbols:
+        - SWDA.MI
+        - EM35.MI
+        - SGLN.MI
+    - account: cash
+      symbols:
+        - XEON.MI
+        - C3M.MI
