@@ -1,4 +1,4 @@
-"""Validation tests for the wf-config.yml loader."""
+"""Validation tests for the wealthfolio-importer-config.yml loader."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from src import config
 
 
 def _write(tmp_path: Path, yaml_text: str) -> Path:
-    p = tmp_path / "wf-config.yml"
+    p = tmp_path / "wealthfolio-importer-config.yml"
     p.write_text(yaml_text, encoding="utf-8")
     return p
 
@@ -67,4 +67,4 @@ def test_rejects_missing_default(tmp_path: Path):
 
 def test_reports_missing_file():
     with pytest.raises(config.ConfigError, match="not found"):
-        config.load(Path("/nonexistent/wf-config.yml"))
+        config.load(Path("/nonexistent/wealthfolio-importer-config.yml"))

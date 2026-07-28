@@ -2,13 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY build/requirements.txt ./
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY build/src ./src
-COPY build/tests ./tests
-COPY build/pyproject.toml ./
-COPY build/app.py ./
+COPY src ./src
+COPY tests ./tests
+COPY pyproject.toml ./
+COPY app.py ./
 
 EXPOSE 23527
 CMD ["streamlit", "run", "app.py", \

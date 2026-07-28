@@ -2,7 +2,7 @@
 
 ## Same symbol can't route to multiple accounts
 
-`wf-config.yml` maps one symbol to one account. The loader rejects collisions. This hurts when one broker account is split across people, tax wrappers, or manual lot tags; the broker export has no signal to tell them apart.
+`wealthfolio-importer-config.yml` maps one symbol to one account. The loader rejects collisions. This hurts when one broker account is split across people, tax wrappers, or manual lot tags; the broker export has no signal to tell them apart.
 
 **Workaround:** after converting, download the generated WF CSV from `data/converted/`, hand-edit the `account` column, and re-upload it. Each synthetic `DEPOSIT` row sits right above its `BUY`; flip them together so cash stays balanced.
 

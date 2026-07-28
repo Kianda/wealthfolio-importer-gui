@@ -3,7 +3,7 @@
 Adding a new broker (Fineco, IBKR, Degiro, ...) is one PR:
 
 1. Add `build/src/adapters/<name>.py` with the four required exports.
-2. Add `build/tests/fixtures/<name>/{input.csv,expected.csv,wf-config.yml}`.
+2. Add `build/tests/fixtures/<name>/{input.csv,expected.csv,wealthfolio-importer-config.yml}`.
 3. Open the PR. The generic contract test runs against your fixture automatically.
 
 ## The contract
@@ -42,13 +42,13 @@ The `account` key is set by the orchestrator. **Adapters must not set it.** The 
 ## Don'ts
 
 - No network access. No filesystem writes. No global state.
-- No account routing logic - that is `wf-config.yml`'s job. Broker-quirk maps (e.g. ticker to Yahoo suffix) are fine; personal ticker-to-account maps are not.
+- No account routing logic - that is `wealthfolio-importer-config.yml`'s job. Broker-quirk maps (e.g. ticker to Yahoo suffix) are fine; personal ticker-to-account maps are not.
 
 ## Fixtures
 
 `build/tests/fixtures/<NAME>/input.csv`: tiny, **anonymised** broker export (5-15 lines). Include at least one row per activity type your adapter emits, plus one row your adapter is expected to skip.
 
-`build/tests/fixtures/<NAME>/expected-<account>.csv`: one golden file per account the orchestrator emits, after the full pipeline (grouping, auto-deposit, sort). The test diffs each generated file against its expected counterpart. Include `wf-config.yml` next to them with the routing rules your goldens assume.
+`build/tests/fixtures/<NAME>/expected-<account>.csv`: one golden file per account the orchestrator emits, after the full pipeline (grouping, auto-deposit, sort). The test diffs each generated file against its expected counterpart. Include `wealthfolio-importer-config.yml` next to them with the routing rules your goldens assume.
 
 Optional: `build/tests/test_<NAME>.py` that runs the pipeline against your fixture and diffs against the expected CSV.
 

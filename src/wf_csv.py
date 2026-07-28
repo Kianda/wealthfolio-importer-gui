@@ -2,7 +2,7 @@
 
 The schema mirrors Wealthfolio's "Import Activities" wizard format, plus
 an extra `account` column that the orchestrator fills in from
-wf-config.yml. The WF UI wizard ignores unknown columns, so the same
+wealthfolio-importer-config.yml. The WF UI wizard ignores unknown columns, so the same
 file is still usable as a fallback manual import.
 """
 

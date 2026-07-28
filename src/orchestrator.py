@@ -12,7 +12,7 @@
     [validate schema]     -- wf_csv.validate_adapter_output
        │
        ▼
-    [apply grouping]      -- set `account` based on wf-config.yml
+    [apply grouping]      -- set `account` based on wealthfolio-importer-config.yml
        │
        ▼
     [auto-deposit]        -- if adapter says so and not overridden;
@@ -88,6 +88,12 @@ def _inject_synthetic_deposits(rows: list[dict[str, Any]]) -> tuple[list[dict[st
     return out, injected
 
 
+def _apply_ticker_map(rows: list[dict[str, Any]], ticker_map: dict[str, str]) -> None:
+    """Remap broker tickers to their canonical symbols in place."""
+    for row in rows:
+        row["symbol"] = ticker_map.get(row["symbol"], row["symbol"])
+
+
 def _apply_grouping(rows: list[dict[str, Any]], accounts: AccountsConfig) -> None:
     """Set the `account` key on each row in place, based on symbol rules."""
     for row in rows:
@@ -105,6 +111,7 @@ def convert(
     *,
     input_path: Path,
     accounts: AccountsConfig,
+    ticker_map: dict[str, str] | None = None,
     broker: str | None = None,
     auto_inject_deposits: bool | None = None,
     output_dir: Path | None = None,
@@ -121,6 +128,9 @@ def convert(
 
     raw_rows = adapter.convert(str(input_path))
     wf_csv.validate_adapter_output(raw_rows, adapter=adapter.name)
+
+    if ticker_map:
+        _apply_ticker_map(raw_rows, ticker_map)
 
     _apply_grouping(raw_rows, accounts)
 

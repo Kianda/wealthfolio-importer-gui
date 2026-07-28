@@ -1,13 +1,10 @@
-"""Loader and validator for `wf-config.yml`.
+"""Loader and validator for `wealthfolio-importer-config.yml`.
 
 The config file maps WF symbols to account names and (optionally) sets
 the Wealthfolio server URL. Sensitive values (passwords) MUST come from
 environment variables, not from the config file.
 
-Example wf-config.yml:
-
-    wealthfolio:
-      base_url: http://localhost:24568
+Example wealthfolio-importer-config.yml:
 
     accounts:
       default: cash
@@ -27,7 +24,7 @@ import yaml
 
 
 class ConfigError(ValueError):
-    """Raised when wf-config.yml is missing required fields or malformed."""
+    """Raised when wealthfolio-importer-config.yml is missing required fields or malformed."""
 
 
 @dataclass(frozen=True)
@@ -64,13 +61,14 @@ class WealthfolioConfig:
 class Config:
     accounts: AccountsConfig
     wealthfolio: WealthfolioConfig = field(default_factory=WealthfolioConfig)
+    ticker_map: dict[str, str] = field(default_factory=dict)
 
 
 def load(path: Path) -> Config:
     if not path.exists():
         raise ConfigError(
             f"Config file not found: {path}\n"
-            f"Copy wf-config.example.yml to wf-config.yml at the repo root."
+            f"Copy wealthfolio-importer-config.example.yml to wealthfolio-importer-config.yml at the repo root."
         )
     with path.open(encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
@@ -130,10 +128,18 @@ def _from_dict(raw: dict, *, source: str) -> Config:
     if external_url is not None and not isinstance(external_url, str):
         raise ConfigError(f"{source}: `wealthfolio.external_url` must be a string")
 
+    ticker_map_raw = raw.get("ticker_map") or {}
+    if not isinstance(ticker_map_raw, dict):
+        raise ConfigError(f"{source}: `ticker_map` must be a mapping if set")
+    for k, v in ticker_map_raw.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            raise ConfigError(f"{source}: `ticker_map` keys and values must be strings")
+
     return Config(
         accounts=AccountsConfig(default=default.strip(), rules=tuple(rules)),
         wealthfolio=WealthfolioConfig(
             base_url=base_url.rstrip("/"),
             external_url=external_url.rstrip("/") if external_url else None,
         ),
+        ticker_map=dict(ticker_map_raw),
     )

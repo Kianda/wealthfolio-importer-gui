@@ -16,7 +16,7 @@ from src.config import ConfigError, load as load_config
 
 # -- paths
 
-CONFIG_PATH   = Path(os.environ.get("WF_CONFIG", "wf-config.yml"))
+CONFIG_PATH   = Path(os.environ.get("WF_CONFIG", "wealthfolio-importer-config.yml"))
 DATA_DIR      = Path("data")
 INPUT_DIR     = DATA_DIR / "input"
 CONVERTED_DIR = DATA_DIR / "converted"
@@ -35,12 +35,8 @@ except ConfigError as e:
     st.error(f"**Config error:** {e}")
     st.stop()
 
-# WF_BASE_URL env var overrides wf-config.yml (useful inside Docker where
-# the service is reachable by container name, not localhost).
 base_url = os.environ.get("WF_BASE_URL") or cfg.wealthfolio.base_url
 
-st.caption(f"Internal: `{base_url}`")
-st.caption(f"External: `{cfg.wealthfolio.external_url or 'not set'}`")
 st.divider()
 
 # -- step 1: upload
@@ -90,6 +86,7 @@ if convert_clicked or "summary" not in st.session_state:
             summary = orchestrator.convert(
                 input_path=tmp_path,
                 accounts=cfg.accounts,
+                ticker_map=cfg.ticker_map,
                 auto_inject_deposits=auto_deposit,
                 output_dir=CONVERTED_DIR,
             )
@@ -143,7 +140,7 @@ st.subheader("3 · Push to Wealthfolio")
 
 with st.form("push_form"):
     password = st.text_input(
-        "Password",
+        "Password (leave empty if auth is disabled)",
         type="password",
         value=os.environ.get("WF_PASSWORD", ""),
     )
@@ -156,24 +153,28 @@ with st.form("push_form"):
 if not push_clicked:
     st.stop()
 
-if not password:
-    st.error("Password is required.")
-    st.stop()
-
 client = api_client.WealthfolioClient(base_url)
 
-with st.spinner("Logging in…"):
-    try:
-        client.login(password)
-    except api_client.ApiError as e:
-        st.error(f"**Login failed:** {e}")
-        st.stop()
+if password:
+    with st.spinner("Logging in…"):
+        try:
+            client.login(password)
+        except api_client.ApiError as e:
+            st.error(f"**Login failed:** {e}")
+            st.stop()
 
 with st.spinner("Fetching accounts…"):
     try:
         wf_accounts = client.list_accounts()
     except api_client.ApiError as e:
         st.error(f"**Could not list accounts:** {e}")
+        if "connection error" in str(e).lower():
+            st.info(
+                "**Network troubleshooting:** the importer container cannot reach "
+                "your Wealthfolio instance. Make sure both containers are on the "
+                "same Docker network and that `base_url` in `wealthfolio-importer-config.yml` uses "
+                "the Wealthfolio container name as the hostname — not `localhost`."
+            )
         st.stop()
 
 name_to_id = {a["name"]: a["id"] for a in wf_accounts}
@@ -197,6 +198,12 @@ for acct, rows in converted_rows.items():
             st.error(f"`{acct}`: check failed: {e}")
             all_ok = False
             continue
+
+    with st.spinner(f"Preparing assets for `{acct}`…"):
+        try:
+            checked = client.ensure_assets(checked)
+        except api_client.ApiError as e:
+            st.warning(f"`{acct}`: asset preparation warning: {e}")
 
     bad = [a for a in checked if a.get("errors")]
     if bad:
