@@ -1,0 +1,22 @@
+﻿Conto : X0000 ROSSI MARIO;;;;;;;;;;;
+Data estrazione : 15-4-2024 09:30:0;;;;;;;;;;;
+;;;;;;;;;;;
+Tutti i movimenti ordinati per Data Operazione;;;;;;;;;;;
+Dal : 01-01-2024;;;;;;;;;;;
+al : 15-04-2024;;;;;;;;;;;
+;;;;;;;;;;;
+Il file include i primi 3000 movimenti;;;;;;;;;;;
+;;;;;;;;;;;
+Data operazione;Data valuta;Tipo operazione;Ticker;Isin;Protocollo;Descrizione;Quantità;Importo euro;Importo Divisa;Divisa;Riferimento ordine
+10-04-2024;31-03-2024;Bollo portafoglio titoli*;;;10000001;;0;-2,5;0;EUR;              
+09-04-2024;11-04-2024;Acquisto;VWCE;IE00BK5BQT80;;VANGUARD FTSE ALL-WORLD UCITS;4;-451,52;0;EUR;10000000000001
+09-04-2024;11-04-2024;Acquisto;AGGH;IE00BDBRDM35;;ISHARES CORE GLOBAL AGGREGATE;5;-24,35;0;EUR;10000000000002
+08-04-2024;08-04-2024;Conferimento con bonifico;;;10000002;;0;500;0;EUR;
+05-04-2024;09-04-2024;Acquisto;EIMI;IE00BKM4GZ66;;ISHARES CORE MSCI EM IMI UCIT;3;-95,64;0;EUR;10000000000003
+05-04-2024;09-04-2024;Commissioni;EIMI;IE00BKM4GZ66;;ISHARES CORE MSCI EM IMI UCIT;0;-1,5;0;EUR;10000000000003
+22-03-2024;26-03-2024;Acquisto;VWCE;IE00BK5BQT80;;VANGUARD FTSE ALL-WORLD UCITS;1;-111,73;0;EUR;10000000000004
+20-03-2024;20-03-2024;Conferimento con bonifico;;;10000003;;0;150;0;EUR;
+15-03-2024;19-03-2024;Acquisto;AGGH;IE00BDBRDM35;;ISHARES CORE GLOBAL AGGREGATE;10;-48,90;0;EUR;10000000000005
+06-03-2024;31-12-2023;Bollo portafoglio titoli*;;;10000004;;0;-2,5;0;EUR;              
+01-03-2024;05-03-2024;Acquisto;EIMI;IE00BKM4GZ66;;ISHARES CORE MSCI EM IMI UCIT;2;-63,40;0;EUR;10000000000006
+28-02-2024;28-02-2024;Conferimento con bonifico;;;10000005;;0;300;0;EUR;

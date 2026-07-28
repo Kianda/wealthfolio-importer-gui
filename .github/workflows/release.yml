@@ -1,0 +1,124 @@
+name: release
+
+# Publishes the Docker image to Docker Hub on a version tag:
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+#   ->  kianda/wf-importer-gui:0.2.0     (immutable, what you roll back to)
+#       kianda/wf-importer-gui:latest    (what the boilerplate pulls by default)
+#
+# ci.yml only runs on pull_request, so a tag push gets no coverage from it.
+# This workflow therefore gates the push on the suite itself — and it runs the
+# suite *inside the built image*, so what gets tested is byte-for-byte what
+# gets published, not a separate pip install that merely resembles it.
+#
+# Requires two repository secrets:
+#   DOCKERHUB_USERNAME  your Docker Hub account (kianda)
+#   DOCKERHUB_TOKEN     a Docker Hub personal access token, Read & Write scope
+#                       (Account Settings -> Personal access tokens). Not your
+#                       account password.
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Re-publish an existing tag, e.g. to rebuild on a newer python:3.12-slim
+  # base without a code change.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to re-release (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Must match the IMAGE line in .env.example — asserted below rather than
+  # trusted, since a mismatch here would publish to the wrong repository.
+  IMAGE_REPO: kianda/wf-importer-gui
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Resolve tag and version
+        id: v
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::Tag '$TAG' must start with 'v'." ; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Guards against IMAGE_REPO above drifting from the documented default.
+      - name: Check image name matches .env.example
+        run: |
+          expected=$(grep '^IMAGE=' .env.example | cut -d= -f2-)
+          if [ "$expected" != "$IMAGE_REPO:latest" ]; then
+            echo "::error::.env.example says '$expected' but IMAGE_REPO is '$IMAGE_REPO'."
+            exit 1
+          fi
+
+      # Through build.sh, so there is no second build path that can drift from
+      # the local one. PUSH is unset here, so this builds only.
+      - name: Build ${{ steps.v.outputs.version }}
+        run: IMAGE=$IMAGE_REPO:${{ steps.v.outputs.version }} bash build.sh
+
+      # The gate. Nothing is pushed if this fails.
+      - name: Run the suite inside the image
+        run: |
+          docker run --rm --entrypoint pytest \
+            "$IMAGE_REPO:${{ steps.v.outputs.version }}"
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Version tag first: if the :latest push then fails, the immutable tag has
+      # still landed and can be pulled explicitly. build.sh is a cache hit after
+      # the build above, so this pushes the image the suite just ran against.
+      - name: Push ${{ steps.v.outputs.version }}
+        run: PUSH=1 IMAGE=$IMAGE_REPO:${{ steps.v.outputs.version }} bash build.sh
+
+      # docker tag, not a second build.sh run: buildkit stamps a fresh
+      # provenance attestation on every build, so rebuilding from identical
+      # source still yields a different manifest digest. Tagging the image that
+      # was just tested and pushed is what makes :latest and :<version>
+      # provably the same artifact.
+      - name: Push latest
+        run: |
+          docker tag "$IMAGE_REPO:${{ steps.v.outputs.version }}" "$IMAGE_REPO:latest"
+          docker push "$IMAGE_REPO:latest"
+
+      - name: Summary
+        run: |
+          digest=$(docker image inspect \
+            --format '{{index .RepoDigests 0}}' \
+            "$IMAGE_REPO:${{ steps.v.outputs.version }}" 2>/dev/null || echo unavailable)
+          {
+            echo "### Published \`${{ steps.v.outputs.tag }}\`"
+            echo
+            echo "| tag | |"
+            echo "|---|---|"
+            echo "| \`$IMAGE_REPO:${{ steps.v.outputs.version }}\` | immutable |"
+            echo "| \`$IMAGE_REPO:latest\` | pulled by wealthfolio-boilerplate |"
+            echo
+            echo "Digest: \`$digest\`"
+            echo
+            echo "Pull: \`docker pull $IMAGE_REPO:${{ steps.v.outputs.version }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

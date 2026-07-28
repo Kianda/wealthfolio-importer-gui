@@ -1,0 +1,78 @@
+name: ci
+
+# Tests and builds pull requests.
+#
+# PRs only, on purpose: the build is fully determined by the checkout, so a
+# push-triggered run straight after a PR run would repeat identical work.
+# The trade-off is that a commit pushed directly to main gets no CI, and that
+# nothing here watches for dependency drift — requirements.txt is unpinned
+# (streamlit>=1.35, pandas>=2.0, ...) with no lockfile, so a PyPI release can
+# break a rebuild with no change in this repo. Add a `schedule:` trigger back
+# if that signal is ever wanted.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast signal on the code itself. This is the job a broker-adapter PR cares
+  # about: the generic contract test in tests/test_adapter_contract.py picks up
+  # tests/fixtures/<NAME>/input.csv automatically, which is what CONTRIBUTING
+  # promises contributors.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the Dockerfile base image, so a failure here is a real
+          # failure and not a version skew against what ships.
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # pyproject.toml already sets testpaths, pythonpath and -ra.
+      - name: pytest
+        run: python -m pytest
+
+      # An adapter with no fixture silently skips its contract test, so a green
+      # run can still mean nothing was checked. Surface that rather than hide it.
+      - name: Warn on skipped adapter contract tests
+        if: success()
+        run: |
+          skipped=$(python -m pytest -q 2>/dev/null | grep -oE '[0-9]+ skipped' || true)
+          if [ -n "$skipped" ]; then
+            echo "::warning::$skipped — an adapter without tests/fixtures/<NAME>/input.csv is not being contract-tested."
+          fi
+
+  # Proves the artifact people actually run still assembles, and that the suite
+  # passes inside it. The Dockerfile copies tests/ in on purpose and
+  # CONTRIBUTING documents `docker run --entrypoint pytest` as the way to run
+  # them, so this is the same command a contributor would use locally.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Via build.sh rather than a bare `docker build`, so there is no second
+      # build path in CI that can drift from the local one. build.sh sources
+      # .env when present (it is gitignored, so absent here) and otherwise
+      # takes IMAGE from the environment. PUSH defaults to 0 — no push.
+      - name: Build image
+        run: IMAGE=wf-importer-gui:ci bash build.sh
+
+      - name: Run the suite inside the image
+        run: docker run --rm --entrypoint pytest wf-importer-gui:ci
