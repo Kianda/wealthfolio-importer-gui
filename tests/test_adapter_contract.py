@@ -48,3 +48,31 @@ def test_adapter_detect_recognises_its_own_fixture(fixtures_dir: Path):
         assert adapter.detect(str(input_path)), (
             f"adapter '{name}' has detect() but does not match its own fixture"
         )
+
+
+def test_adapter_withdrawal_flag_defaults_to_deposit_flag():
+    """AUTO_INJECT_WITHDRAWALS is optional so adapters written before SELL
+    support keep working: they inherit whatever AUTO_INJECT_DEPOSITS says."""
+    import types
+
+    module = types.ModuleType("fake_adapter")
+    module.NAME = "fake"
+    module.DESCRIPTION = "fake"
+    module.AUTO_INJECT_DEPOSITS = True
+    module.convert = lambda path: []
+
+    adapter = adapters_pkg._load(module)
+    assert adapter.auto_inject_withdrawals is True
+
+    module.AUTO_INJECT_DEPOSITS = False
+    assert adapters_pkg._load(module).auto_inject_withdrawals is False
+
+    # An explicit declaration wins over the fallback.
+    module.AUTO_INJECT_WITHDRAWALS = True
+    assert adapters_pkg._load(module).auto_inject_withdrawals is True
+
+
+def test_registered_adapters_declare_both_flags():
+    for name, adapter in REGISTRY.items():
+        assert isinstance(adapter.auto_inject_deposits, bool), name
+        assert isinstance(adapter.auto_inject_withdrawals, bool), name

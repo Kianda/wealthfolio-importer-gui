@@ -64,15 +64,27 @@ if not uploaded:
 
 st.subheader("2 · Convert")
 
-auto_deposit = st.toggle(
-    "Auto-inject deposits",
-    value=True,
-    help=(
-        "Insert a synthetic DEPOSIT before each BUY so Wealthfolio's "
-        "cash balance never goes negative. Disable only if you record "
-        "deposits yourself."
-    ),
-)
+col_dep, col_wdr = st.columns(2)
+with col_dep:
+    auto_deposit = st.toggle(
+        "Auto-inject deposits",
+        value=True,
+        help=(
+            "Insert a synthetic DEPOSIT before each BUY so Wealthfolio's "
+            "cash balance never goes negative. Disable only if you record "
+            "deposits yourself."
+        ),
+    )
+with col_wdr:
+    auto_withdrawal = st.toggle(
+        "Auto-inject withdrawals",
+        value=True,
+        help=(
+            "Insert a synthetic WITHDRAWAL after each SELL so the proceeds "
+            "do not pile up as cash the account never really held. Disable "
+            "only if you record withdrawals yourself."
+        ),
+    )
 
 convert_clicked = st.button("Convert", type="primary")
 
@@ -88,6 +100,7 @@ if convert_clicked or "summary" not in st.session_state:
                 accounts=cfg.accounts,
                 ticker_map=cfg.ticker_map,
                 auto_inject_deposits=auto_deposit,
+                auto_inject_withdrawals=auto_withdrawal,
                 output_dir=CONVERTED_DIR,
             )
         st.session_state["summary"] = summary
@@ -107,7 +120,8 @@ converted_rows: dict[str, list] = st.session_state["converted_rows"]
 st.success(
     f"Converted **{summary.row_count} rows** · "
     f"adapter `{summary.adapter_name}` · "
-    f"{summary.deposits_injected} deposits injected"
+    f"{summary.deposits_injected} deposits / "
+    f"{summary.withdrawals_injected} withdrawals injected"
 )
 
 for acct, rows in converted_rows.items():

@@ -4,6 +4,7 @@ Each adapter is a single module in this package exposing:
   NAME: str
   DESCRIPTION: str
   AUTO_INJECT_DEPOSITS: bool
+  AUTO_INJECT_WITHDRAWALS: bool  # optional, defaults to AUTO_INJECT_DEPOSITS
   detect(path: str) -> bool   # optional
   convert(path: str) -> list[dict]
 """
@@ -22,6 +23,7 @@ class Adapter:
     name: str
     description: str
     auto_inject_deposits: bool
+    auto_inject_withdrawals: bool
     detect: Callable[[str], bool] | None
     convert: Callable[[str], list[dict[str, Any]]]
 
@@ -43,6 +45,11 @@ def _load(module: ModuleType) -> Adapter:
         name=module.NAME,
         description=module.DESCRIPTION,
         auto_inject_deposits=bool(module.AUTO_INJECT_DEPOSITS),
+        # Optional so adapters written before SELL support keep working:
+        # a broker whose deposits are synthetic needs synthetic withdrawals too.
+        auto_inject_withdrawals=bool(
+            getattr(module, "AUTO_INJECT_WITHDRAWALS", module.AUTO_INJECT_DEPOSITS)
+        ),
         detect=detect,
         convert=module.convert,
     )

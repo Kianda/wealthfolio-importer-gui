@@ -20,7 +20,13 @@
                              account so funds land in the right place
        │
        ▼
-    [stable sort by date] -- DEPOSITs precede same-date BUYs
+    [auto-withdrawal]     -- mirror image: each SELL is followed by a
+                             WITHDRAWAL of the proceeds, so the sale
+                             does not leave phantom cash behind
+       │
+       ▼
+    [stable sort by date] -- DEPOSITs precede same-date BUYs,
+                             WITHDRAWALs follow same-date SELLs
        │
        ▼
     [write CSV]
@@ -45,6 +51,7 @@ class ConvertSummary:
     adapter_name: str
     row_count: int
     deposits_injected: int
+    withdrawals_injected: int
     by_account: dict[str, int]
 
 
@@ -88,6 +95,43 @@ def _inject_synthetic_deposits(rows: list[dict[str, Any]]) -> tuple[list[dict[st
     return out, injected
 
 
+def _inject_synthetic_withdrawals(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Append a WITHDRAWAL row after each SELL row of equal proceeds.
+
+    The mirror image of _inject_synthetic_deposits. A SELL credits the
+    account with its proceeds; broker movement exports rarely carry the
+    matching cash sweep, so without this the account accumulates cash
+    that was never really there. Withdrawing the proceeds keeps the cash
+    balance flat, exactly as the BUY/DEPOSIT pair does.
+
+    Order matters: the WITHDRAWAL must come AFTER its SELL, or the cash
+    it removes has not been credited yet. Each row copies the SELL's
+    `account` if present, so must run AFTER grouping.
+    """
+    out: list[dict[str, Any]] = []
+    injected = 0
+    for row in rows:
+        out.append(row)
+        if row["activityType"] == "SELL":
+            proceeds = round(row["quantity"] * row["unitPrice"], 2)
+            withdrawal = {
+                "date": row["date"],
+                "symbol": "",
+                "instrumentType": "",
+                "quantity": 1,
+                "activityType": "WITHDRAWAL",
+                "unitPrice": 1,
+                "currency": row["currency"],
+                "fee": 0,
+                "amount": proceeds,
+            }
+            if "account" in row:
+                withdrawal["account"] = row["account"]
+            out.append(withdrawal)
+            injected += 1
+    return out, injected
+
+
 def _apply_ticker_map(rows: list[dict[str, Any]], ticker_map: dict[str, str]) -> None:
     """Remap broker tickers to their canonical symbols in place."""
     for row in rows:
@@ -102,7 +146,8 @@ def _apply_grouping(rows: list[dict[str, Any]], accounts: AccountsConfig) -> Non
 
 def _sort_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Stable sort by date. DEPOSITs precede same-date BUYs because they
-    were prepended; Python's sort is stable, so ties preserve order.
+    were prepended, and WITHDRAWALs follow same-date SELLs because they
+    were appended; Python's sort is stable, so ties preserve order.
     """
     return sorted(rows, key=lambda r: r["date"])
 
@@ -114,6 +159,7 @@ def convert(
     ticker_map: dict[str, str] | None = None,
     broker: str | None = None,
     auto_inject_deposits: bool | None = None,
+    auto_inject_withdrawals: bool | None = None,
     output_dir: Path | None = None,
 ) -> ConvertSummary:
     """Run the full pipeline. Writes one WF CSV per account into
@@ -134,13 +180,21 @@ def convert(
 
     _apply_grouping(raw_rows, accounts)
 
-    should_inject = (
+    inject_deposits = (
         adapter.auto_inject_deposits if auto_inject_deposits is None else auto_inject_deposits
     )
-    if should_inject:
-        rows, injected = _inject_synthetic_deposits(raw_rows)
-    else:
-        rows, injected = list(raw_rows), 0
+    inject_withdrawals = (
+        adapter.auto_inject_withdrawals
+        if auto_inject_withdrawals is None
+        else auto_inject_withdrawals
+    )
+
+    rows = list(raw_rows)
+    deposits = withdrawals = 0
+    if inject_deposits:
+        rows, deposits = _inject_synthetic_deposits(rows)
+    if inject_withdrawals:
+        rows, withdrawals = _inject_synthetic_withdrawals(rows)
 
     rows = _sort_rows(rows)
 
@@ -165,6 +219,7 @@ def convert(
         output_paths=output_paths,
         adapter_name=adapter.name,
         row_count=len(rows),
-        deposits_injected=injected,
+        deposits_injected=deposits,
+        withdrawals_injected=withdrawals,
         by_account=by_account,
     )

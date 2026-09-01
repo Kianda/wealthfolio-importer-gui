@@ -29,9 +29,11 @@ from typing import Any
 NAME = "directa"
 DESCRIPTION = "Directa Trading (Italy) - Movimenti or Ordini CSV export"
 AUTO_INJECT_DEPOSITS = True
+AUTO_INJECT_WITHDRAWALS = True
 
 _MOVIMENTI_TYPE_MAP = {
     "Acquisto": "BUY",
+    "Vendita":  "SELL",
 }
 
 _ORDINI_TYPE_MAP = {
@@ -62,6 +64,10 @@ def _parse_movimenti(lines: list[str]) -> list[dict[str, Any]]:
         if tipo not in _MOVIMENTI_TYPE_MAP:
             continue
         qty = _parse_it_float(raw["Quantità"])
+        if qty == 0:
+            # Cash-only movement (fee, tax, stamp duty). Not a trade; the
+            # unitPrice division below would blow up. Skip.
+            continue
         importo = abs(_parse_it_float(raw["Importo euro"]))
         rows.append({
             "date": datetime.strptime(raw["Data operazione"].strip(), "%d-%m-%Y").strftime("%Y-%m-%d"),
